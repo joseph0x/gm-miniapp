@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image" href="/base.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="fc:miniapp" content='{
+    "version":"next",
+    "imageUrl":"https://your-domain.com/embed-image.png",
+    "button":{
+      "title":"Open GM Mini App",
+      "action":{
+        "type":"launch_miniapp",
+        "name":"GM on Base",
+        "url":"https://your-domain.com"
+      }
+    }
+  }' />
+  <title>gm-miniapp</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
+</html>

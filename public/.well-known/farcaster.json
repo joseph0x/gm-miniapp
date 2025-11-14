@@ -1,0 +1,34 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "baseBuilder": {
+    "ownerAddress": "0xbC941379A7b7B58B16d9e40a7Ae33D0D2f709c0e"
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "GM on Base",
+    "homeUrl": "https://your-domain.com",
+    "iconUrl": "https://your-domain.com/icon.png",
+    "splashImageUrl": "https://your-domain.com/splash.png",
+    "splashBackgroundColor": "#000000",
+    "webhookUrl": "https://your-domain.com/api/webhook",
+    "subtitle": "Say GM on Base",
+    "description": "Hit the button to say GM every 24h on Base. Leaderboard ranks wallets by GM count.",
+    "screenshotUrls": [
+      "https://your-domain.com/s1.png",
+      "https://your-domain.com/s2.png",
+      "https://your-domain.com/s3.png"
+    ],
+    "primaryCategory": "social",
+    "tags": ["gm", "base", "miniapp"],
+    "heroImageUrl": "https://your-domain.com/og.png",
+    "tagline": "Say GM daily",
+    "ogTitle": "GM on Base",
+    "ogDescription": "Say GM on Base and climb the leaderboard.",
+    "ogImageUrl": "https://your-domain.com/og.png",
+    "noindex": true
+  }
+}
