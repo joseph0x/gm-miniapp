@@ -10,25 +10,7 @@
   "miniapp": {
     "version": "1",
     "name": "GM on Base",
-    "homeUrl": "https://gmminiapp.vercel.app/",
-    "iconUrl": "https://gmminiapp.vercel.app/base.png",
-    "splashImageUrl": "https://your-domain.com/splash.png",
-    "splashBackgroundColor": "#000000",
-    "webhookUrl": "https://your-domain.com/api/webhook",
-    "subtitle": "Say GM on Base",
-    "description": "Hit the button to say GM every 24h on Base. Leaderboard ranks wallets by GM count.",
-    "screenshotUrls": [
-      "https://your-domain.com/s1.png",
-      "https://your-domain.com/s2.png",
-      "https://your-domain.com/s3.png"
-    ],
-    "primaryCategory": "social",
-    "tags": ["gm", "base", "miniapp"],
-    "heroImageUrl": "https://your-domain.com/og.png",
-    "tagline": "Say GM daily",
-    "ogTitle": "GM on Base",
-    "ogDescription": "Say GM on Base and climb the leaderboard.",
-    "ogImageUrl": "https://gmminiapp.vercel.app/base.png",
-    "noindex": true
+    "homeUrl": "https://gmminiapp.vercel.app",
+    "iconUrl": "https://gmminiapp.vercel.app/base.png"
   }
 }

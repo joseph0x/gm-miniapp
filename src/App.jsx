@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import leaderboard from "./assets/images/leaderboard.png";
+import { sdk } from "@farcaster/miniapp-sdk";
 import {
   useAccount,
   useConnect,
@@ -7,7 +7,7 @@ import {
   usePublicClient,
 } from "wagmi";
 import { parseEther, parseAbiItem } from "viem";
-import { sdk } from "@farcaster/miniapp-sdk";
+import leaderboard from "/leaderboard.png";
 
 function App() {
   const [gmCount, setGmCount] = useState(11111111);
