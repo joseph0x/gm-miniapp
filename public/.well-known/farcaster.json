@@ -10,8 +10,8 @@
   "miniapp": {
     "version": "1",
     "name": "GM on Base",
-    "homeUrl": "https://your-domain.com",
-    "iconUrl": "https://your-domain.com/icon.png",
+    "homeUrl": "https://gmminiapp.vercel.app/",
+    "iconUrl": "https://gmminiapp.vercel.app/base.png",
     "splashImageUrl": "https://your-domain.com/splash.png",
     "splashBackgroundColor": "#000000",
     "webhookUrl": "https://your-domain.com/api/webhook",
@@ -28,7 +28,7 @@
     "tagline": "Say GM daily",
     "ogTitle": "GM on Base",
     "ogDescription": "Say GM on Base and climb the leaderboard.",
-    "ogImageUrl": "https://your-domain.com/og.png",
+    "ogImageUrl": "https://gmminiapp.vercel.app/base.png",
     "noindex": true
   }
 }
