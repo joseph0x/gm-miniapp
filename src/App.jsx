@@ -32,7 +32,15 @@ function App() {
   ];
 
   useEffect(() => {
-    sdk.actions.ready();
+    // Hide splash screen once app is ready
+    console.log("Initializing Farcaster SDK...");
+    try {
+      sdk.actions.ready();
+      console.log("SDK ready() called successfully");
+      console.log("SDK context:", sdk.context);
+    } catch (error) {
+      console.error("Error calling SDK ready():", error);
+    }
   }, []);
 
   const [carouselItems, setCarouselItems] = useState([]);
