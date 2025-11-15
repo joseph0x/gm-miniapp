@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
-import { sdk } from "@farcaster/miniapp-sdk";
 import {
   useAccount,
   useConnect,
   useWriteContract,
   usePublicClient,
 } from "wagmi";
-import { parseEther, parseAbiItem } from "viem";
-import leaderboard from "/leaderboard.png";
+import { parseEther, parseAbi, parseAbiItem } from "viem";
+import { sdk } from "@farcaster/miniapp-sdk";
 
 function App() {
   const [gmCount, setGmCount] = useState(11111111);
@@ -15,32 +14,25 @@ function App() {
   const [receivedGm, setReceivedGm] = useState(2);
   const [lastGmAt, setLastGmAt] = useState(null);
   const [remaining, setRemaining] = useState(0);
+  const [error, setError] = useState("");
 
   const { address, isConnected } = useAccount();
   const { connect, connectors, isPending: isConnecting } = useConnect();
   const { writeContractAsync, isPending: isWriting } = useWriteContract();
   const publicClient = usePublicClient();
 
-  const CONTRACT_ADDRESS = "0x978099EC2949F88AF89535a1Aa3282c5E97Ba0CD"; // replace after deploying
+  const CONTRACT_ADDRESS = "0x978099EC2949F88AF89535a1Aa3282c5E97Ba0CD"; // your deployed address
   const GM_COST_ETH = "0.000001";
-  const GM_ABI = [
+  const GM_ABI = parseAbi([
     "function sayGM() payable",
     "function getUser(address) view returns (uint256 count, uint256 last)",
     "function totalUsers() view returns (uint256)",
     "function userAt(uint256) view returns (address)",
     "event GM(address indexed user, uint256 timestamp)",
-  ];
+  ]);
 
   useEffect(() => {
-    // Hide splash screen once app is ready
-    console.log("Initializing Farcaster SDK...");
-    try {
-      sdk.actions.ready();
-      console.log("SDK ready() called successfully");
-      console.log("SDK context:", sdk.context);
-    } catch (error) {
-      console.error("Error calling SDK ready():", error);
-    }
+    sdk.actions.ready();
   }, []);
 
   const [carouselItems, setCarouselItems] = useState([]);
@@ -134,8 +126,17 @@ function App() {
     loadRecent();
   }, []);
 
+  const farcasterConnector = connectors.find((c) =>
+    c.id?.toLowerCase().includes("farcaster")
+  );
+
   const handleGmClick = async () => {
-    if (!isConnected || isWriting || remaining > 0) return;
+    setError("");
+    if (!isConnected) {
+      setError("Please connect your Farcaster wallet first.");
+      return;
+    }
+    if (isWriting || remaining > 0) return;
     try {
       await writeContractAsync({
         address: CONTRACT_ADDRESS,
@@ -143,7 +144,6 @@ function App() {
         functionName: "sayGM",
         value: parseEther(GM_COST_ETH),
       });
-      // Refresh stats after write
       const [count, last] = await publicClient.readContract({
         address: CONTRACT_ADDRESS,
         abi: GM_ABI,
@@ -153,13 +153,14 @@ function App() {
       setSaidGm(Number(count));
       setLastGmAt(Number(last) * 1000);
       setGmCount((c) => c + 1);
-    } catch {
-      // ignore error or show a toast
+    } catch (e) {
+      setError(e?.shortMessage || e?.message || "Transaction failed.");
     }
   };
 
   return (
     <div style={styles.appContainer}>
+      {/* Header Section */}
       <div style={styles.header}>
         <div style={styles.stats}>
           <p style={styles.statText}>Your GMs : {saidGm}</p>
@@ -167,13 +168,25 @@ function App() {
           <p style={styles.statText}>
             Overall GM Count: {gmCount.toLocaleString()}
           </p>
+          {/* Trophy Icon */}
           <div style={styles.trophyIcon}>
-            <img src={leaderboard} alt="leaderboard" height="48" width="48" />
+            <span
+              role="img"
+              aria-label="leaderboard"
+              style={{ fontSize: "32px" }}
+            >
+              🏆
+            </span>
           </div>
         </div>
+
         <button
           style={styles.walletBtn}
-          onClick={() => connect({ connector: connectors[0] })}
+          onClick={() =>
+            farcasterConnector
+              ? connect({ connector: farcasterConnector })
+              : setError("Farcaster connector not detected.")
+          }
           disabled={isConnecting}
         >
           {isConnected
@@ -181,6 +194,7 @@ function App() {
             : "CONNECT WALLET"}
         </button>
       </div>
+      {/* Center GM Button */}
       <div style={styles.centerSection}>
         <button
           style={styles.gmBtn}
@@ -196,6 +210,12 @@ function App() {
           {Math.floor((remaining % 3600) / 60)}m {remaining % 60}s
         </div>
       )}
+      {error && (
+        <div style={{ textAlign: "center", color: "red", fontSize: "0.85rem" }}>
+          {error}
+        </div>
+      )}
+      {/* Carousel Footer */}
       <div style={styles.carouselContainer}>
         <div style={styles.carousel}>
           {carouselItems.map((wallet, index) => (
