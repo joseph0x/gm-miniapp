@@ -7,6 +7,7 @@ import {
 } from "wagmi";
 import { parseEther, parseAbi, parseAbiItem } from "viem";
 import { sdk } from "@farcaster/miniapp-sdk";
+import leaderboard from "https://gmminiapp.vercel.app/leaderboard.png";
 
 function App() {
   const [gmCount, setGmCount] = useState(11111111);
@@ -130,6 +131,7 @@ function App() {
     c.id?.toLowerCase().includes("farcaster")
   );
 
+  // ... existing code ...
   const handleGmClick = async () => {
     setError("");
     if (!isConnected) {
@@ -138,12 +140,15 @@ function App() {
     }
     if (isWriting || remaining > 0) return;
     try {
-      await writeContractAsync({
+      const hash = await writeContractAsync({
         address: CONTRACT_ADDRESS,
         abi: GM_ABI,
         functionName: "sayGM",
         value: parseEther(GM_COST_ETH),
       });
+
+      await publicClient.waitForTransactionReceipt({ hash });
+
       const [count, last] = await publicClient.readContract({
         address: CONTRACT_ADDRESS,
         abi: GM_ABI,
@@ -170,13 +175,7 @@ function App() {
           </p>
           {/* Trophy Icon */}
           <div style={styles.trophyIcon}>
-            <span
-              role="img"
-              aria-label="leaderboard"
-              style={{ fontSize: "32px" }}
-            >
-              🏆
-            </span>
+            <img src={leaderboard} alt="leaderboard" height="48" width="48" />
           </div>
         </div>
 
@@ -196,25 +195,26 @@ function App() {
       </div>
       {/* Center GM Button */}
       <div style={styles.centerSection}>
-        <button
-          style={styles.gmBtn}
-          onClick={handleGmClick}
-          disabled={!isConnected || isWriting || remaining > 0}
-        >
-          <span style={styles.gmBtnText}>HIT TO SAY 'GM'</span>
-        </button>
+        {remaining > 0 ? (
+          <div style={{ fontWeight: 700 }}>
+            {(() => {
+              const h = Math.floor(remaining / 3600);
+              const m = Math.floor((remaining % 3600) / 60);
+              const s = remaining % 60;
+              const pad = (n) => String(n).padStart(2, "0");
+              return `NEXT GM IN ${pad(h)}:${pad(m)}:${pad(s)}`;
+            })()}
+          </div>
+        ) : (
+          <button
+            style={styles.gmBtn}
+            onClick={handleGmClick}
+            disabled={!isConnected || isWriting}
+          >
+            <span style={styles.gmBtnText}>HIT TO SAY 'GM'</span>
+          </button>
+        )}
       </div>
-      {remaining > 0 && (
-        <div style={styles.countdownText}>
-          Next GM in {Math.floor(remaining / 3600)}h{" "}
-          {Math.floor((remaining % 3600) / 60)}m {remaining % 60}s
-        </div>
-      )}
-      {error && (
-        <div style={{ textAlign: "center", color: "red", fontSize: "0.85rem" }}>
-          {error}
-        </div>
-      )}
       {/* Carousel Footer */}
       <div style={styles.carouselContainer}>
         <div style={styles.carousel}>
