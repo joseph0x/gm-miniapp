@@ -21,7 +21,7 @@ function App() {
   const { writeContractAsync, isPending: isWriting } = useWriteContract();
   const publicClient = usePublicClient();
 
-  const CONTRACT_ADDRESS = "0xYOUR_DEPLOYED_CONTRACT"; // replace after deploying
+  const CONTRACT_ADDRESS = "0x978099EC2949F88AF89535a1Aa3282c5E97Ba0CD"; // replace after deploying
   const GM_COST_ETH = "0.000001";
   const GM_ABI = [
     "function sayGM() payable",
