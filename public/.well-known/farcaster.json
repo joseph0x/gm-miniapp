@@ -5,12 +5,28 @@
     "signature": ""
   },
   "baseBuilder": {
-    "ownerAddress": "0xYOUR_BASE_ACCOUNT_ADDRESS"
+    "ownerAddress": "0xbC941379A7b7B58B16d9e40a7Ae33D0D2f709c0e"
   },
   "miniapp": {
     "version": "1",
     "name": "GM on Base",
-    "homeUrl": "https://gmminiapp.vercel.app",
-    "iconUrl": "https://gmminiapp.vercel.app/icon.png"
+    "homeUrl": "https://gmminiapp.vercel.app/",
+    "iconUrl": "https://gmminiapp.vercel.app/base.png",
+    "splashImageUrl": "https://gmminiapp.vercel.app/splash.png",
+    "splashBackgroundColor": "#000000",
+    "webhookUrl": "https://ex.co/api/webhook",
+    "subtitle": "Hit the button to say GM on Base",
+    "description": "fun.",
+    "screenshotUrls": ["https://gmminiapp.vercel.app/screenshot.png"],
+    "requiredChains": ["eip155:8453"],
+    "requiredCapabilities": ["actions.signIn", "wallet.getEthereumProvider"],
+    "primaryCategory": "social",
+    "tags": ["gm", "base", "miniapp"],
+    "heroImageUrl": "https://gmminiapp.vercel.app/og.png",
+    "tagline": "say GM",
+    "ogTitle": "GM on Base",
+    "ogDescription": "Say GM on Base and climb the leaderboard.",
+    "ogImageUrl": "https://gmminiapp.vercel.app/og.png",
+    "noindex": false
   }
 }
