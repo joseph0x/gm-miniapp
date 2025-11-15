@@ -5,12 +5,12 @@
     "signature": ""
   },
   "baseBuilder": {
-    "ownerAddress": "0xbC941379A7b7B58B16d9e40a7Ae33D0D2f709c0e"
+    "ownerAddress": "0xYOUR_BASE_ACCOUNT_ADDRESS"
   },
   "miniapp": {
     "version": "1",
     "name": "GM on Base",
     "homeUrl": "https://gmminiapp.vercel.app",
-    "iconUrl": "https://gmminiapp.vercel.app/base.png"
+    "iconUrl": "https://gmminiapp.vercel.app/icon.png"
   }
 }
