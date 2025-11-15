@@ -15,7 +15,7 @@
     "splashImageUrl": "https://gmminiapp.vercel.app/splash.png",
     "splashBackgroundColor": "#000000",
     "webhookUrl": "https://ex.co/api/webhook",
-    "subtitle": "Hit the button to say GM on Base",
+    "subtitle": "Hit the button to say GM",
     "description": "fun.",
     "screenshotUrls": ["https://gmminiapp.vercel.app/screenshot.png"],
     "requiredChains": ["eip155:8453"],
