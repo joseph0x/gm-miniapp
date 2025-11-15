@@ -9,9 +9,9 @@ import { parseEther, parseAbi, parseAbiItem } from "viem";
 import { sdk } from "@farcaster/miniapp-sdk";
 
 function App() {
-  const [gmCount, setGmCount] = useState(11111111);
-  const [saidGm, setSaidGm] = useState(25);
-  const [receivedGm, setReceivedGm] = useState(2);
+  const [gmCount, setGmCount] = useState(0);
+  const [saidGm, setSaidGm] = useState(0);
+  const [receivedGm, setReceivedGm] = useState(0);
   const [lastGmAt, setLastGmAt] = useState(null);
   const [remaining, setRemaining] = useState(0);
   const [error, setError] = useState("");
@@ -200,7 +200,7 @@ function App() {
       {/* Center GM Button */}
       <div style={styles.centerSection}>
         {remaining > 0 ? (
-          <div style={{ fontWeight: 700 }}>
+          <div style={{ fontWeight: 700, fontSize: 24 }}>
             {(() => {
               const h = Math.floor(remaining / 3600);
               const m = Math.floor((remaining % 3600) / 60);
