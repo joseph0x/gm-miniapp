@@ -7,7 +7,6 @@ import {
 } from "wagmi";
 import { parseEther, parseAbi, parseAbiItem } from "viem";
 import { sdk } from "@farcaster/miniapp-sdk";
-import leaderboard from "https://gmminiapp.vercel.app/leaderboard.png";
 
 function App() {
   const [gmCount, setGmCount] = useState(11111111);
@@ -175,7 +174,12 @@ function App() {
           </p>
           {/* Trophy Icon */}
           <div style={styles.trophyIcon}>
-            <img src={leaderboard} alt="leaderboard" height="48" width="48" />
+            <img
+              src="https://gmminiapp.vercel.app/leaderboard.png"
+              alt="leaderboard"
+              height="48"
+              width="48"
+            />
           </div>
         </div>
 
