@@ -15,13 +15,14 @@ function App() {
   const [lastGmAt, setLastGmAt] = useState(null);
   const [remaining, setRemaining] = useState(0);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const { address, isConnected } = useAccount();
   const { connect, connectors, isPending: isConnecting } = useConnect();
   const { writeContractAsync, isPending: isWriting } = useWriteContract();
   const publicClient = usePublicClient();
 
-  const CONTRACT_ADDRESS = "0x978099EC2949F88AF89535a1Aa3282c5E97Ba0CD"; // your deployed address
+  const CONTRACT_ADDRESS = "0x978099EC2949F88AF89535a1Aa3282c5E97Ba0CD";
   const GM_COST_ETH = "0.000001";
   const GM_ABI = parseAbi([
     "function sayGM() payable",
@@ -32,7 +33,12 @@ function App() {
   ]);
 
   useEffect(() => {
-    sdk.actions.ready();
+    try {
+      sdk.actions.ready();
+    } catch (e) {
+      console.error("SDK ready failed:", e);
+    }
+    setLoading(false);
   }, []);
 
   const [carouselItems, setCarouselItems] = useState([]);
@@ -51,7 +57,7 @@ function App() {
   // Load your stats from contract
   useEffect(() => {
     const loadSelf = async () => {
-      if (!isConnected || !address) return;
+      if (!isConnected || !address || !publicClient) return;
       try {
         const [count, last] = await publicClient.readContract({
           address: CONTRACT_ADDRESS,
@@ -61,51 +67,68 @@ function App() {
         });
         setSaidGm(Number(count));
         if (Number(last) > 0) setLastGmAt(Number(last) * 1000);
-      } catch {}
+      } catch (e) {
+        console.error("Load self failed:", e);
+      }
     };
     loadSelf();
-  }, [isConnected, address]);
+  }, [isConnected, address, publicClient]);
 
   // Load leaderboard and overall GM count
   useEffect(() => {
     const loadLeaderboard = async () => {
+      if (!publicClient) return;
       try {
         const total = await publicClient.readContract({
           address: CONTRACT_ADDRESS,
           abi: GM_ABI,
           functionName: "totalUsers",
         });
+
+        const totalNum = Number(total);
+        if (totalNum === 0) return;
+
+        // Limit to prevent timeout on slower devices
+        const limit = Math.min(totalNum, 50);
         const users = [];
-        for (let i = 0; i < Number(total); i++) {
-          const user = await publicClient.readContract({
-            address: CONTRACT_ADDRESS,
-            abi: GM_ABI,
-            functionName: "userAt",
-            args: [BigInt(i)],
-          });
-          const [count] = await publicClient.readContract({
-            address: CONTRACT_ADDRESS,
-            abi: GM_ABI,
-            functionName: "getUser",
-            args: [user],
-          });
-          users.push({ address: user, count: Number(count) });
+
+        for (let i = 0; i < limit; i++) {
+          try {
+            const user = await publicClient.readContract({
+              address: CONTRACT_ADDRESS,
+              abi: GM_ABI,
+              functionName: "userAt",
+              args: [BigInt(i)],
+            });
+            const [count] = await publicClient.readContract({
+              address: CONTRACT_ADDRESS,
+              abi: GM_ABI,
+              functionName: "getUser",
+              args: [user],
+            });
+            users.push({ address: user, count: Number(count) });
+          } catch (e) {
+            console.error(`Failed to load user ${i}:`, e);
+          }
         }
+
         users.sort((a, b) => b.count - a.count);
         const overall = users.reduce((sum, u) => sum + u.count, 0);
         setGmCount(overall);
-        // You can render top N in UI later if/when you add that section
-      } catch {}
+      } catch (e) {
+        console.error("Load leaderboard failed:", e);
+      }
     };
     loadLeaderboard();
-  }, []);
+  }, [publicClient]);
 
   // Load recent 24h GM events for carousel
   useEffect(() => {
     const loadRecent = async () => {
+      if (!publicClient) return;
       try {
         const latest = await publicClient.getBlockNumber();
-        const approx24hBlocks = 43200n; // ~2s per block * 24h
+        const approx24hBlocks = 43200n;
         const fromBlock =
           latest > approx24hBlocks ? latest - approx24hBlocks : 0n;
         const gmEvent = parseAbiItem(
@@ -117,20 +140,23 @@ function App() {
           fromBlock,
           toBlock: latest,
         });
-        const addrs = logs.map((l) => l.args.user);
+
+        // Limit logs to prevent memory issues
+        const recentLogs = logs.slice(-100);
+        const addrs = recentLogs.map((l) => l.args.user);
         const short = addrs.map((a) => `${a.slice(0, 6)}...${a.slice(-4)}`);
-        // Duplicate for infinite effect
         setCarouselItems([...short, ...short, ...short]);
-      } catch {}
+      } catch (e) {
+        console.error("Load recent failed:", e);
+      }
     };
     loadRecent();
-  }, []);
+  }, [publicClient]);
 
   const farcasterConnector = connectors.find((c) =>
     c.id?.toLowerCase().includes("farcaster")
   );
 
-  // ... existing code ...
   const handleGmClick = async () => {
     setError("");
     if (!isConnected) {
@@ -159,26 +185,38 @@ function App() {
       setGmCount((c) => c + 1);
     } catch (e) {
       setError(e?.shortMessage || e?.message || "Transaction failed.");
+      console.error("GM transaction failed:", e);
     }
   };
 
+  if (loading) {
+    return (
+      <div style={styles.appContainer}>
+        <div style={styles.centerSection}>
+          <div style={{ fontWeight: 700, fontSize: 18 }}>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.appContainer}>
+      <style>{keyframesCSS}</style>
+
       {/* Header Section */}
       <div style={styles.header}>
         <div style={styles.stats}>
-          <p style={styles.statText}>Your GMs : {saidGm}</p>
-          <p style={styles.statText}>GMs received : {receivedGm} </p>
+          <p style={styles.statText}>Your GMs: {saidGm}</p>
+          <p style={styles.statText}>GMs received: {receivedGm}</p>
           <p style={styles.statText}>
             Overall GM Count: {gmCount.toLocaleString()}
           </p>
-          {/* Trophy Icon */}
           <div style={styles.trophyIcon}>
             <img
               src="https://gmminiapp.vercel.app/leaderboard.png"
               alt="leaderboard"
-              height="48"
               width="48"
+              height="48"
             />
           </div>
         </div>
@@ -197,10 +235,11 @@ function App() {
             : "CONNECT WALLET"}
         </button>
       </div>
+
       {/* Center GM Button */}
       <div style={styles.centerSection}>
         {remaining > 0 ? (
-          <div style={{ fontWeight: 700, fontSize: 24 }}>
+          <div style={styles.countdownText}>
             {(() => {
               const h = Math.floor(remaining / 3600);
               const m = Math.floor((remaining % 3600) / 60);
@@ -211,14 +250,22 @@ function App() {
           </div>
         ) : (
           <button
-            style={styles.gmBtn}
+            style={{
+              ...styles.gmBtn,
+              ...((!isConnected || isWriting) && styles.gmBtnDisabled),
+            }}
             onClick={handleGmClick}
             disabled={!isConnected || isWriting}
           >
-            <span style={styles.gmBtnText}>HIT TO SAY 'GM'</span>
+            <span style={styles.gmBtnText}>
+              {isWriting ? "SENDING..." : "HIT TO SAY 'GM'"}
+            </span>
           </button>
         )}
       </div>
+
+      {error && <div style={styles.errorText}>{error}</div>}
+
       {/* Carousel Footer */}
       <div style={styles.carouselContainer}>
         <div style={styles.carousel}>
@@ -234,26 +281,39 @@ function App() {
   );
 }
 
+const keyframesCSS = `
+  @keyframes scroll {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-33.33%);
+    }
+  }
+`;
+
 const styles = {
   appContainer: {
     width: "100%",
-    maxWidth: "400px",
-    minHeight: "600px",
-    margin: "auto",
+    height: "100vh",
+    margin: "0",
     padding: "20px",
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
     background: "#fff",
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    fontFamily:
+      "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif",
     position: "relative",
     overflow: "hidden",
+    boxSizing: "border-box",
   },
   header: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
     gap: "20px",
+    flexShrink: 0,
   },
   stats: {
     display: "flex",
@@ -273,27 +333,30 @@ const styles = {
     fontSize: "0.9rem",
     margin: "0",
     lineHeight: "1.4",
+    color: "#000",
   },
   walletBtn: {
     padding: "10px 12px",
     border: "2px solid #000",
     borderRadius: "8px",
-    background: "none",
+    background: "#fff",
     cursor: "pointer",
     fontWeight: "700",
     fontSize: "0.75rem",
     whiteSpace: "nowrap",
     flexShrink: 0,
+    transition: "transform 0.2s",
   },
   centerSection: {
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
     flex: 1,
+    minHeight: "0",
   },
   gmBtn: {
-    width: "220px",
-    height: "220px",
+    width: "min(220px, 60vw)",
+    height: "min(220px, 60vw)",
     background: "#0000FF",
     border: "none",
     borderRadius: "50%",
@@ -304,9 +367,26 @@ const styles = {
     boxShadow: "0 8px 20px rgba(0, 0, 255, 0.3)",
     transition: "transform 0.2s, box-shadow 0.2s",
   },
+  gmBtnDisabled: {
+    opacity: 1,
+    cursor: "not-allowed",
+  },
   gmBtnText: {
     display: "block",
     lineHeight: "1.5",
+  },
+  countdownText: {
+    textAlign: "center",
+    fontSize: "1.5rem",
+    fontWeight: "700",
+    color: "#000",
+  },
+  errorText: {
+    textAlign: "center",
+    color: "#ff0000",
+    fontSize: "0.85rem",
+    padding: "10px",
+    flexShrink: 0,
   },
   carouselContainer: {
     width: "calc(100% + 40px)",
@@ -315,6 +395,7 @@ const styles = {
     overflow: "hidden",
     position: "relative",
     paddingBottom: "10px",
+    flexShrink: 0,
   },
   carousel: {
     display: "flex",
@@ -334,41 +415,6 @@ const styles = {
   saidGmText: {
     fontWeight: "400",
   },
-  countdownText: {
-    textAlign: "center",
-    fontSize: "0.9rem",
-    marginBottom: "10px",
-  },
 };
-
-// Add keyframes animation via style tag
-const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-  @keyframes scroll {
-    0% {
-      transform: translateX(0);
-    }
-    100% {
-      transform: translateX(-33.33%);
-    }
-  }
-  
-  button:hover {
-    transform: scale(1.05);
-  }
-  
-  button:active {
-    transform: scale(0.95);
-  }
-
-  @media (max-width: 480px) {
-    .gm-btn {
-      width: 180px !important;
-      height: 180px !important;
-      font-size: 1.2rem !important;
-    }
-  }
-`;
-document.head.appendChild(styleSheet);
 
 export default App;
