@@ -129,30 +129,37 @@ function App() {
   }, [loadGmCount]);
 
   // OPTIMIZED: Load recent GM events for carousel - reduced block range
+  // ... existing code ...
+  // ... existing code ...
   const loadRecentGms = useCallback(async () => {
     if (!publicClient) return;
     try {
       const latest = await publicClient.getBlockNumber();
-      // Reduced to ~6 hours worth of blocks for faster loading
-      const approx6hBlocks = 10800n;
+      // Reduced range for reliability
+      const approx6hBlocks = 43200n;
       const fromBlock = latest > approx6hBlocks ? latest - approx6hBlocks : 0n;
 
       const gmEvent = parseAbiItem(
         "event GM(address indexed user, uint256 timestamp)"
       );
+      console.log("[GM Logs] Querying logs", {
+        latest: latest.toString(),
+        fromBlock: fromBlock.toString(),
+      });
       const logs = await publicClient.getLogs({
         address: CONTRACT_ADDRESS,
         event: gmEvent,
         fromBlock,
         toBlock: latest,
       });
+      console.log("[GM Logs] Logs count:", logs.length);
 
       if (logs.length === 0) {
         setCarouselItems([]);
+        console.log("[GM Logs] No logs found in range.");
         return;
       }
 
-      // Get last 5 unique addresses
       const uniqueAddresses = [];
       const seen = new Set();
 
@@ -164,16 +171,132 @@ function App() {
         }
       }
 
+      console.log("[GM Logs] Unique addresses:", uniqueAddresses);
+
       const short = uniqueAddresses.map(
         (a) => `${a.slice(0, 6)}...${a.slice(-4)}`
       );
-      // Duplicate for infinite scroll effect
+      console.log("[GM Logs] Carousel addresses:", short);
       setCarouselItems([...short, ...short, ...short, ...short]);
     } catch (e) {
       console.error("Load recent failed:", e);
+      console.log("[GM Logs] Retrying with smaller block range...");
+      try {
+        const latest = await publicClient.getBlockNumber();
+        const smallRange = 4000n;
+        const fromBlock = latest > smallRange ? latest - smallRange : 0n;
+
+        const gmEvent = parseAbiItem(
+          "event GM(address indexed user, uint256 timestamp)"
+        );
+        console.log("[GM Logs Retry] Querying logs", {
+          latest: latest.toString(),
+          fromBlock: fromBlock.toString(),
+        });
+        const logs = await publicClient.getLogs({
+          address: CONTRACT_ADDRESS,
+          event: gmEvent,
+          fromBlock,
+          toBlock: latest,
+        });
+        console.log("[GM Logs Retry] Logs count:", logs.length);
+
+        if (logs.length === 0) {
+          setCarouselItems([]);
+          console.log("[GM Logs Retry] No logs found.");
+          return;
+        }
+
+        const uniqueAddresses = [];
+        const seen = new Set();
+
+        for (
+          let i = logs.length - 1;
+          i >= 0 && uniqueAddresses.length < 5;
+          i--
+        ) {
+          const addr = logs[i].args.user;
+          if (!seen.has(addr)) {
+            seen.add(addr);
+            uniqueAddresses.push(addr);
+          }
+        }
+
+        console.log("[GM Logs Retry] Unique addresses:", uniqueAddresses);
+
+        const short = uniqueAddresses.map(
+          (a) => `${a.slice(0, 6)}...${a.slice(-4)}`
+        );
+        console.log("[GM Logs Retry] Carousel addresses:", short);
+        setCarouselItems([...short, ...short, ...short, ...short]);
+      } catch (e2) {
+        console.error("Retry logs failed:", e2);
+        console.log(
+          "[GM Contract Fallback] Sampling users by last GM timestamp..."
+        );
+        try {
+          const total = await publicClient.readContract({
+            address: CONTRACT_ADDRESS,
+            abi: GM_ABI,
+            functionName: "totalUsers",
+          });
+          const totalNum = Number(total);
+          console.log("[GM Contract Fallback] totalUsers:", totalNum);
+          if (totalNum === 0) {
+            setCarouselItems([]);
+            console.log("[GM Contract Fallback] No users.");
+            return;
+          }
+
+          const maxScan = Math.min(totalNum, 50);
+          const start = Math.max(0, totalNum - maxScan);
+          const cutoffMs = Date.now() - 24 * 60 * 60 * 1000;
+
+          const recentAddrs = [];
+          for (
+            let i = totalNum - 1;
+            i >= start && recentAddrs.length < 5;
+            i--
+          ) {
+            try {
+              const user = await publicClient.readContract({
+                address: CONTRACT_ADDRESS,
+                abi: GM_ABI,
+                functionName: "userAt",
+                args: [BigInt(i)],
+              });
+              const [, last] = await publicClient.readContract({
+                address: CONTRACT_ADDRESS,
+                abi: GM_ABI,
+                functionName: "getUser",
+                args: [user],
+              });
+              if (Number(last) * 1000 >= cutoffMs) {
+                recentAddrs.push(user);
+              }
+            } catch {}
+          }
+
+          console.log(
+            "[GM Contract Fallback] Recent addresses (24h):",
+            recentAddrs
+          );
+
+          const short = recentAddrs.map(
+            (a) => `${a.slice(0, 6)}...${a.slice(-4)}`
+          );
+          console.log("[GM Contract Fallback] Carousel addresses:", short);
+          setCarouselItems(
+            short.length ? [...short, ...short, ...short, ...short] : []
+          );
+        } catch (e3) {
+          console.error("Contract fallback failed:", e3);
+          setCarouselItems([]);
+        }
+      }
     }
   }, [publicClient]);
-
+  // ... existing code ...
   useEffect(() => {
     loadRecentGms();
   }, [loadRecentGms]);
