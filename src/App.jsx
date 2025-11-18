@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   useAccount,
   useConnect,
@@ -15,7 +15,7 @@ function App() {
   const [lastGmAt, setLastGmAt] = useState(null);
   const [remaining, setRemaining] = useState(0);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const { address, isConnected } = useAccount();
   const { connect, connectors, isPending: isConnecting } = useConnect();
@@ -38,7 +38,6 @@ function App() {
     } catch (e) {
       console.error("SDK ready failed:", e);
     }
-    setLoading(false);
   }, []);
 
   const [carouselItems, setCarouselItems] = useState([]);
@@ -54,104 +53,130 @@ function App() {
     return () => clearInterval(timer);
   }, [lastGmAt]);
 
-  // Load your stats from contract
-  useEffect(() => {
-    const loadSelf = async () => {
-      if (!isConnected || !address || !publicClient) return;
-      try {
-        const [count, last] = await publicClient.readContract({
-          address: CONTRACT_ADDRESS,
-          abi: GM_ABI,
-          functionName: "getUser",
-          args: [address],
-        });
-        setSaidGm(Number(count));
-        if (Number(last) > 0) setLastGmAt(Number(last) * 1000);
-      } catch (e) {
-        console.error("Load self failed:", e);
-      }
-    };
-    loadSelf();
+  // Load your stats from contract - OPTIMIZED
+  const loadUserStats = useCallback(async () => {
+    if (!isConnected || !address || !publicClient) return;
+    try {
+      const [count, last] = await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: GM_ABI,
+        functionName: "getUser",
+        args: [address],
+      });
+      setSaidGm(Number(count));
+      if (Number(last) > 0) setLastGmAt(Number(last) * 1000);
+    } catch (e) {
+      console.error("Load self failed:", e);
+    }
   }, [isConnected, address, publicClient]);
 
-  // Load leaderboard and overall GM count
   useEffect(() => {
-    const loadLeaderboard = async () => {
-      if (!publicClient) return;
-      try {
-        const total = await publicClient.readContract({
-          address: CONTRACT_ADDRESS,
-          abi: GM_ABI,
-          functionName: "totalUsers",
-        });
+    loadUserStats();
+  }, [loadUserStats]);
 
-        const totalNum = Number(total);
-        if (totalNum === 0) return;
+  // OPTIMIZED: Load only total GM count, not individual users
+  const loadGmCount = useCallback(async () => {
+    if (!publicClient) return;
+    try {
+      const total = await publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: GM_ABI,
+        functionName: "totalUsers",
+      });
 
-        // Limit to prevent timeout on slower devices
-        const limit = Math.min(totalNum, 50);
-        const users = [];
+      const totalNum = Number(total);
+      if (totalNum === 0) {
+        setIsInitialLoad(false);
+        return;
+      }
 
-        for (let i = 0; i < limit; i++) {
-          try {
-            const user = await publicClient.readContract({
-              address: CONTRACT_ADDRESS,
-              abi: GM_ABI,
-              functionName: "userAt",
-              args: [BigInt(i)],
-            });
-            const [count] = await publicClient.readContract({
-              address: CONTRACT_ADDRESS,
-              abi: GM_ABI,
-              functionName: "getUser",
-              args: [user],
-            });
-            users.push({ address: user, count: Number(count) });
-          } catch (e) {
-            console.error(`Failed to load user ${i}:`, e);
-          }
+      // Just load first 10 users to calculate approximate total GMs
+      const limit = Math.min(totalNum, 10);
+      let totalGms = 0;
+
+      for (let i = 0; i < limit; i++) {
+        try {
+          const user = await publicClient.readContract({
+            address: CONTRACT_ADDRESS,
+            abi: GM_ABI,
+            functionName: "userAt",
+            args: [BigInt(i)],
+          });
+          const [count] = await publicClient.readContract({
+            address: CONTRACT_ADDRESS,
+            abi: GM_ABI,
+            functionName: "getUser",
+            args: [user],
+          });
+          totalGms += Number(count);
+        } catch (e) {
+          console.error(`Failed to load user ${i}:`, e);
         }
-
-        users.sort((a, b) => b.count - a.count);
-        const overall = users.reduce((sum, u) => sum + u.count, 0);
-        setGmCount(overall);
-      } catch (e) {
-        console.error("Load leaderboard failed:", e);
       }
-    };
-    loadLeaderboard();
+
+      // Estimate total based on sample
+      const estimated = Math.round((totalGms / limit) * totalNum);
+      setGmCount(estimated);
+      setIsInitialLoad(false);
+    } catch (e) {
+      console.error("Load GM count failed:", e);
+      setIsInitialLoad(false);
+    }
   }, [publicClient]);
 
-  // Load recent 24h GM events for carousel
   useEffect(() => {
-    const loadRecent = async () => {
-      if (!publicClient) return;
-      try {
-        const latest = await publicClient.getBlockNumber();
-        const approx24hBlocks = 43200n;
-        const fromBlock =
-          latest > approx24hBlocks ? latest - approx24hBlocks : 0n;
-        const gmEvent = parseAbiItem(
-          "event GM(address indexed user, uint256 timestamp)"
-        );
-        const logs = await publicClient.getLogs({
-          address: CONTRACT_ADDRESS,
-          event: gmEvent,
-          fromBlock,
-          toBlock: latest,
-        });
+    loadGmCount();
+  }, [loadGmCount]);
 
-        // Limit logs to prevent memory issues
-        const recentLogs = logs.slice(-100);
-        const addrs = recentLogs.map((l) => l.args.user);
-        const short = addrs.map((a) => `${a.slice(0, 6)}...${a.slice(-4)}`);
-        setCarouselItems([...short, ...short, ...short]);
-      } catch (e) {
-        console.error("Load recent failed:", e);
+  // OPTIMIZED: Load recent GM events for carousel - reduced block range
+  const loadRecentGms = useCallback(async () => {
+    if (!publicClient) return;
+    try {
+      const latest = await publicClient.getBlockNumber();
+      // Reduced to ~6 hours worth of blocks for faster loading
+      const approx6hBlocks = 10800n;
+      const fromBlock = latest > approx6hBlocks ? latest - approx6hBlocks : 0n;
+
+      const gmEvent = parseAbiItem(
+        "event GM(address indexed user, uint256 timestamp)"
+      );
+      const logs = await publicClient.getLogs({
+        address: CONTRACT_ADDRESS,
+        event: gmEvent,
+        fromBlock,
+        toBlock: latest,
+      });
+
+      if (logs.length === 0) {
+        setCarouselItems([]);
+        return;
       }
-    };
-    loadRecent();
+
+      // Get last 5 unique addresses
+      const uniqueAddresses = [];
+      const seen = new Set();
+
+      for (let i = logs.length - 1; i >= 0 && uniqueAddresses.length < 5; i--) {
+        const addr = logs[i].args.user;
+        if (!seen.has(addr)) {
+          seen.add(addr);
+          uniqueAddresses.push(addr);
+        }
+      }
+
+      const short = uniqueAddresses.map(
+        (a) => `${a.slice(0, 6)}...${a.slice(-4)}`
+      );
+      // Duplicate for infinite scroll effect
+      setCarouselItems([...short, ...short, ...short, ...short]);
+    } catch (e) {
+      console.error("Load recent failed:", e);
+    }
   }, [publicClient]);
+
+  useEffect(() => {
+    loadRecentGms();
+  }, [loadRecentGms]);
 
   const farcasterConnector = connectors.find((c) =>
     c.id?.toLowerCase().includes("farcaster")
@@ -164,7 +189,16 @@ function App() {
       return;
     }
     if (isWriting || remaining > 0) return;
+
     try {
+      // OPTIMISTIC UPDATE: Update UI immediately
+      const newCount = saidGm + 1;
+      const newTimestamp = Date.now();
+      setSaidGm(newCount);
+      setLastGmAt(newTimestamp);
+      setGmCount((c) => c + 1);
+
+      // Send transaction
       const hash = await writeContractAsync({
         address: CONTRACT_ADDRESS,
         abi: GM_ABI,
@@ -172,28 +206,50 @@ function App() {
         value: parseEther(GM_COST_ETH),
       });
 
-      await publicClient.waitForTransactionReceipt({ hash });
+      // Wait for confirmation in background
+      publicClient
+        .waitForTransactionReceipt({ hash })
+        .then(async () => {
+          // Verify actual values from contract
+          const [count, last] = await publicClient.readContract({
+            address: CONTRACT_ADDRESS,
+            abi: GM_ABI,
+            functionName: "getUser",
+            args: [address],
+          });
+          setSaidGm(Number(count));
+          setLastGmAt(Number(last) * 1000);
 
-      const [count, last] = await publicClient.readContract({
-        address: CONTRACT_ADDRESS,
-        abi: GM_ABI,
-        functionName: "getUser",
-        args: [address],
-      });
-      setSaidGm(Number(count));
-      setLastGmAt(Number(last) * 1000);
-      setGmCount((c) => c + 1);
+          // Reload carousel with new GM
+          loadRecentGms();
+        })
+        .catch((e) => {
+          console.error("Transaction confirmation failed:", e);
+          // Revert optimistic update on failure
+          setSaidGm(newCount - 1);
+          setLastGmAt(null);
+          setGmCount((c) => c - 1);
+          setError("Transaction failed to confirm.");
+        });
     } catch (e) {
+      // Revert optimistic update on error
+      setSaidGm(saidGm);
+      setLastGmAt(lastGmAt);
+      setGmCount((c) => c - 1);
       setError(e?.shortMessage || e?.message || "Transaction failed.");
       console.error("GM transaction failed:", e);
     }
   };
 
-  if (loading) {
+  // Show minimal loading state
+  if (isInitialLoad) {
     return (
       <div style={styles.appContainer}>
+        <style>{keyframesCSS}</style>
         <div style={styles.centerSection}>
-          <div style={{ fontWeight: 700, fontSize: 18 }}>Loading...</div>
+          <div style={{ fontWeight: 700, fontSize: 18, color: "#666" }}>
+            Loading...
+          </div>
         </div>
       </div>
     );
@@ -267,16 +323,18 @@ function App() {
       {error && <div style={styles.errorText}>{error}</div>}
 
       {/* Carousel Footer */}
-      <div style={styles.carouselContainer}>
-        <div style={styles.carousel}>
-          {carouselItems.map((wallet, index) => (
-            <div key={index} style={styles.carouselItem}>
-              <span style={styles.walletAddress}>{wallet}</span>
-              <span style={styles.saidGmText}> said GM</span>
-            </div>
-          ))}
+      {carouselItems.length > 0 && (
+        <div style={styles.carouselContainer}>
+          <div style={styles.carousel}>
+            {carouselItems.map((wallet, index) => (
+              <div key={index} style={styles.carouselItem}>
+                <span style={styles.walletAddress}>{wallet}</span>
+                <span style={styles.saidGmText}> said GM</span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -287,7 +345,7 @@ const keyframesCSS = `
       transform: translateX(0);
     }
     100% {
-      transform: translateX(-33.33%);
+      transform: translateX(-25%);
     }
   }
 `;
@@ -295,7 +353,7 @@ const keyframesCSS = `
 const styles = {
   appContainer: {
     width: "100%",
-    height: "100vh",
+    height: "100dvh",
     margin: "0",
     padding: "20px",
     display: "flex",
@@ -365,7 +423,7 @@ const styles = {
     color: "#FFFFFF",
     cursor: "pointer",
     boxShadow: "0 8px 20px rgba(0, 0, 255, 0.3)",
-    transition: "transform 0.2s, box-shadow 0.2s",
+    transition: "transform 0.2s, box-shadow 0.2s, opacity 0.2s",
   },
   gmBtnDisabled: {
     opacity: 1,
@@ -400,7 +458,7 @@ const styles = {
   carousel: {
     display: "flex",
     gap: "30px",
-    animation: "scroll 30s linear infinite",
+    animation: "scroll 20s linear infinite",
     width: "max-content",
     paddingLeft: "20px",
   },
