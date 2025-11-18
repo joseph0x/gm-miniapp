@@ -364,20 +364,6 @@ function App() {
     }
   };
 
-  // Show minimal loading state
-  if (isInitialLoad) {
-    return (
-      <div style={styles.appContainer}>
-        <style>{keyframesCSS}</style>
-        <div style={styles.centerSection}>
-          <div style={{ fontWeight: 700, fontSize: 18, color: "#666" }}>
-            Loading...
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div style={styles.appContainer}>
       <style>{keyframesCSS}</style>
